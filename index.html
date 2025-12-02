@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora + Convertidor (corregido)</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #eef; display:flex; justify-content:center;}
+    .contenedor { background:#fff;padding:20px;width:340px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.08);}
+    h2 { text-align:center; margin: 6px 0 12px; }
+    input, select, button { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #cfcfcf; font-size:1rem; }
+    .operaciones { display:flex; gap:6px; justify-content:space-between; }
+    .operaciones button { width:23%; padding:10px; border:none; border-radius:8px; background:#4c89ff; color:#fff; cursor:pointer; }
+    .resultado { font-weight:bold; text-align:center; margin-top:10px; min-height:1.4em;}
+    .small { font-size:0.9rem; color:#555; text-align:center; margin-top:6px; }
+  </style>
+</head>
+<body>
+
+<div class="contenedor">
+  <h2>Mini Calculadora</h2>
+
+  <input type="number" id="num1" placeholder="Primer número">
+  <input type="number" id="num2" placeholder="Segundo número">
+
+  <div class="operaciones">
+    <button onclick="operar('suma')">+</button>
+    <button onclick="operar('resta')">−</button>
+    <button onclick="operar('multi')">×</button>
+    <button onclick="operar('divi')">÷</button>
+  </div>
+
+  <p id="resCalc" class="resultado"></p>
+
+  <hr>
+
+  <h2>Convertidor de Divisas (MXN → otra)</h2>
+
+  <input type="number" id="cantidad" placeholder="Cantidad en MXN">
+
+  <select id="divisa">
+    <option value="USD_MXN">Dólar (USD)</option>
+    <option value="EUR_MXN">Euro (EUR)</option>
+    <option value="JPY_MXN">Yen (JPY)</option>
+  </select>
+
+  <button id="convertBtn" disabled>Convertir</button>
+
+  <p id="resDiv" class="resultado"></p>
+  <p id="status" class="small">Cargando tasas...</p>
+</div>
+
+<script>
+  // ---------- CALCULADORA ----------
+  function operar(tipo) {
+    const el = id => document.getElementById(id);
+    const n1 = parseFloat(el("num1").value);
+    const n2 = parseFloat(el("num2").value);
+    const out = el("resCalc");
+
+    if (isNaN(n1) || isNaN(n2)) {
+      out.innerText = "Ingresa números válidos.";
+      return;
+    }
+
+    let res;
+    if (tipo === "suma") res = n1 + n2;
+    else if (tipo === "resta") res = n1 - n2;
+    else if (tipo === "multi") res = n1 * n2;
+    else if (tipo === "divi") {
+      if (n2 === 0) { out.innerText = "No se puede dividir entre 0."; return; }
+      res = n1 / n2;
+    }
+    out.innerText = "Resultado: " + res;
+  }
+
+  // ---------- CONVERTIDOR ----------
+  const el = id => document.getElementById(id);
+  let tasas = null;
+  const fallbackTasas = {
+    "USD_MXN": 20.5,
+    "EUR_MXN": 22.3,
+    "JPY_MXN": 0.14
+  };
+
+  async function cargarTasas() {
+    el("status").innerText = "Cargando tasas desde divisas.json...";
+    try {
+      const resp = await fetch("divisas.json");
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (!data || !data.tasas) throw new Error("JSON inválido: faltan tasas");
+      tasas = data.tasas;
+      console.log("Tasas cargadas:", tasas);
+      el("status").innerText = "Tasas cargadas.";
+    } catch (err) {
+      console.warn("No se pudieron cargar tasas desde divisas.json:", err);
+      tasas = fallbackTasas; // usamos tasas de respaldo
+      el("status").innerText = "No se pudieron cargar tasas (usando valores por defecto).";
+    } finally {
+      el("convertBtn").disabled = false;
+    }
+  }
+
+  function convertir() {
+    const cantidad = parseFloat(el("cantidad").value);
+    const tipo = el("divisa").value;
+    const salida = el("resDiv");
+
+    if (isNaN(cantidad)) {
+      salida.innerText = "Ingresa una cantidad válida.";
+      return;
+    }
+
+    if (!tasas) {
+      salida.innerText = "Tasas no disponibles aún. Intenta de nuevo.";
+      return;
+    }
+
+    const tasa = parseFloat(tasas[tipo]);
+    if (isNaN(tasa) || tasa === 0) {
+      salida.innerText = "Tasa inválida para la divisa seleccionada.";
+      console.error("Tasa inválida:", tasas, "tipo:", tipo);
+      return;
+    }
+
+    // Suponemos: tasa = MXN por 1 unidad de divisa (ej. 20.5 MXN = 1 USD)
+    // Usuario da cantidad en MXN, queremos obtener cuántas unidades de la divisa = cantidad / tasa
+    const resultado = cantidad / tasa;
+    salida.innerText = `Resultado: ${resultado.toFixed(2)} ${tipo.replace("_MXN","")}`;
+  }
+
+  // Eventos
+  document.addEventListener("DOMContentLoaded", () => {
+    cargarTasas();
+    el("convertBtn").addEventListener("click", convertir);
+  });
+</script>
+
+</body>
+</html>
